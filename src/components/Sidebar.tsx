@@ -9,6 +9,7 @@ import {
   Sparkles,
   PanelLeftClose,
   PanelLeft,
+  X,
 } from 'lucide-react';
 import type { ChatSession } from '@/types';
 
@@ -19,6 +20,8 @@ interface SidebarProps {
   onNewChat: () => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
 }
 
 export default function Sidebar({
@@ -28,6 +31,8 @@ export default function Sidebar({
   onNewChat,
   collapsed,
   onToggleCollapsed,
+  mobileOpen,
+  onCloseMobile,
 }: SidebarProps) {
   const [query, setQuery] = useState('');
 
@@ -39,9 +44,20 @@ export default function Sidebar({
     ? recent.filter((s) => s.title.toLowerCase().includes(query.toLowerCase()))
     : recent;
 
-  if (collapsed) {
+  const handleSelect = (id: string) => {
+    onSelect(id);
+    onCloseMobile();
+  };
+
+  const handleNew = () => {
+    onNewChat();
+    onCloseMobile();
+  };
+
+  // Collapsed (desktop only)
+  if (collapsed && !mobileOpen) {
     return (
-      <aside className="w-16 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col items-center py-4 gap-3">
+      <aside className="hidden md:flex w-16 shrink-0 border-r border-gray-200 bg-gray-50 flex-col items-center py-4 gap-3">
         <button
           onClick={onToggleCollapsed}
           className="p-2 rounded-lg hover:bg-gray-200 text-gray-600 transition"
@@ -64,8 +80,8 @@ export default function Sidebar({
     );
   }
 
-  return (
-    <aside className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col h-full">
+  const sidebarContent = (
+    <>
       {/* Logo */}
       <div className="px-4 h-16 flex items-center justify-between border-b border-gray-200">
         <div className="flex items-center gap-2.5">
@@ -81,17 +97,24 @@ export default function Sidebar({
         </div>
         <button
           onClick={onToggleCollapsed}
-          className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition"
+          className="hidden md:flex p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition"
           title="Collapse sidebar"
         >
           <PanelLeftClose className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onCloseMobile}
+          className="md:hidden p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition"
+          title="Close"
+        >
+          <X className="w-5 h-5" />
         </button>
       </div>
 
       {/* New Chat */}
       <div className="px-3 pt-3">
         <button
-          onClick={onNewChat}
+          onClick={handleNew}
           className="w-full h-10 rounded-xl bg-black text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-gray-800 active:scale-[0.98] transition shadow-sm"
         >
           <Plus className="w-4 h-4" />
@@ -114,8 +137,8 @@ export default function Sidebar({
 
       {/* Scrollable nav */}
       <div className="flex-1 overflow-y-auto scroll-thin px-3 pt-3 pb-2">
-        <NavSection icon={<FileText className="w-4 h-4" />} label="Documents" items={docs} activeSessionId={activeSessionId} onSelect={onSelect} />
-        <NavSection icon={<Youtube className="w-4 h-4" />} label="YouTube Videos" items={vids} activeSessionId={activeSessionId} onSelect={onSelect} />
+        <NavSection icon={<FileText className="w-4 h-4" />} label="Documents" items={docs} activeSessionId={activeSessionId} onSelect={handleSelect} />
+        <NavSection icon={<Youtube className="w-4 h-4" />} label="YouTube Videos" items={vids} activeSessionId={activeSessionId} onSelect={handleSelect} />
 
         <div className="mt-4">
           <div className="flex items-center gap-2 px-2 mb-1.5 text-gray-500">
@@ -131,7 +154,7 @@ export default function Sidebar({
             {filtered.map((s) => (
               <button
                 key={s.id}
-                onClick={() => onSelect(s.id)}
+                onClick={() => handleSelect(s.id)}
                 className={`w-full text-left px-2.5 py-2 rounded-lg text-sm transition flex items-center gap-2 ${
                   s.id === activeSessionId
                     ? 'bg-black text-white font-medium'
@@ -165,7 +188,29 @@ export default function Sidebar({
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop static sidebar */}
+      <aside className="hidden md:flex w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex-col h-full">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile drawer */}
+      {mobileOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 z-40 fade-in"
+            onClick={onCloseMobile}
+          />
+          <aside className="md:hidden fixed top-0 left-0 bottom-0 w-72 max-w-[85vw] bg-gray-50 border-r border-gray-200 flex flex-col z-50 slide-in">
+            {sidebarContent}
+          </aside>
+        </>
+      )}
+    </>
   );
 }
 

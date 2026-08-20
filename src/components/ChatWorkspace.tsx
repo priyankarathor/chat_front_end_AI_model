@@ -8,6 +8,7 @@ import {
   Send,
   Sparkles,
   Square,
+  Menu,
 } from 'lucide-react';
 import type { ChatMessage, ChatSource } from '@/types';
 import { SUGGESTED_QUESTIONS } from '@/types';
@@ -28,6 +29,7 @@ interface ChatWorkspaceProps {
   listening: boolean;
   onToggleListen: () => void;
   interimTranscript: string;
+  onOpenMobileSidebar: () => void;
 }
 
 export default function ChatWorkspace({
@@ -45,6 +47,7 @@ export default function ChatWorkspace({
   listening,
   onToggleListen,
   interimTranscript,
+  onOpenMobileSidebar,
 }: ChatWorkspaceProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -85,7 +88,14 @@ export default function ChatWorkspace({
   return (
     <div className="flex-1 flex flex-col h-full bg-white slide-in">
       {/* Header */}
-      <header className="h-16 shrink-0 border-b border-gray-200 px-5 flex items-center gap-3 bg-white">
+      <header className="h-16 shrink-0 border-b border-gray-200 px-3 sm:px-5 flex items-center gap-2 sm:gap-3 bg-white">
+        <button
+          onClick={onOpenMobileSidebar}
+          className="md:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition shrink-0"
+          title="Open menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         <div className="w-9 h-9 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center shrink-0">
           {isYoutube ? (
             <Youtube className="w-4.5 h-4.5 text-gray-700" />
@@ -102,17 +112,17 @@ export default function ChatWorkspace({
             <span className="text-xs text-gray-500 leading-none">Ready to chat</span>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded-md bg-gray-100 text-xs font-semibold text-gray-700 border border-gray-200">
+        <span className="hidden sm:inline px-2.5 py-1 rounded-md bg-gray-100 text-xs font-semibold text-gray-700 border border-gray-200">
           {isYoutube ? 'YouTube' : 'Document'}
         </span>
-        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition" title="More options">
+        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition shrink-0" title="More options">
           <MoreHorizontal className="w-5 h-5" />
         </button>
       </header>
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-thin">
-        <div className="max-w-3xl mx-auto px-5 py-6">
+        <div className="max-w-3xl mx-auto px-3 sm:px-5 py-4 sm:py-6">
           {isEmpty ? (
             <EmptyState source={source} onPick={(q) => onSend(q)} />
           ) : (
@@ -156,7 +166,7 @@ export default function ChatWorkspace({
       </div>
 
       {/* Input */}
-      <div className="shrink-0 px-5 pb-5 pt-1 bg-white">
+      <div className="shrink-0 px-3 sm:px-5 pb-3 sm:pb-5 pt-1 bg-white">
         <div className="max-w-3xl mx-auto">
           <div
             className={`flex items-end gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition ${
@@ -223,16 +233,16 @@ function EmptyState({ source, onPick }: { source: ChatSource; onPick: (q: string
           <FileText className="w-8 h-8 text-gray-700" />
         )}
       </div>
-      <h2 className="text-2xl font-bold text-black mb-2">
+      <h2 className="text-xl sm:text-2xl font-bold text-black mb-2">
         {isYoutube ? 'Your video is ready.' : 'Your document is ready.'}
       </h2>
-      <p className="text-gray-500 max-w-md mb-7">
+      <p className="text-gray-500 max-w-md mb-6 sm:mb-7 text-sm sm:text-base">
         {isYoutube
           ? 'Ask anything about the content, and AI will find answers from the video transcript.'
           : 'Ask anything about the content, and AI will find answers from your uploaded document.'}
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-xl px-1">
         {SUGGESTED_QUESTIONS.map((q) => (
           <button
             key={q}

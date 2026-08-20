@@ -10,6 +10,7 @@ export default function App() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [partialAnswer, setPartialAnswer] = useState('');
   const [view, setView] = useState<'upload' | 'chat'>('upload');
@@ -165,9 +166,11 @@ export default function App() {
         onNewChat={handleNewChat}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
         {view === 'chat' && activeSession ? (
           <ChatWorkspace
             source={activeSession.source}
@@ -184,6 +187,7 @@ export default function App() {
             listening={listening}
             onToggleListen={handleToggleListen}
             interimTranscript={interim}
+            onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
           />
         ) : (
           <UploadScreen onComplete={handleUploadComplete} />

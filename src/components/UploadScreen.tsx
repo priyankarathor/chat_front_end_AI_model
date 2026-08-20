@@ -114,23 +114,23 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-white px-6 py-10 overflow-y-auto scroll-thin">
+    <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6 py-8 sm:py-10 overflow-y-auto scroll-thin">
       <div className="w-full max-w-2xl scale-in">
         {/* Hero */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-black mb-5 shadow-lg shadow-black/10">
-            <Sparkles className="w-8 h-8 text-white" />
+        <div className="text-center mb-8 sm:mb-10">
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-black mb-4 sm:mb-5 shadow-lg shadow-black/10">
+            <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-black">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-black">
             Chat with your content
           </h1>
-          <p className="mt-3 text-gray-500 text-base max-w-md mx-auto">
+          <p className="mt-3 text-gray-500 text-sm sm:text-base max-w-md mx-auto">
             Upload a document or paste a YouTube link. AI will read it and answer any question you ask.
           </p>
         </div>
 
         {/* Mode toggle */}
-        <div className="flex p-1 bg-gray-100 rounded-xl mb-6 w-fit mx-auto border border-gray-200">
+        <div className="flex p-1 bg-gray-100 rounded-xl mb-5 sm:mb-6 w-fit mx-auto border border-gray-200">
           <button
             onClick={() => setMode('document')}
             className={`px-5 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${
@@ -157,7 +157,7 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
             onClick={() => inputRef.current?.click()}
-            className={`relative rounded-2xl border-2 border-dashed bg-gray-50/50 px-8 py-14 text-center cursor-pointer transition group ${
+            className={`relative rounded-2xl border-2 border-dashed bg-gray-50/50 px-6 sm:px-8 py-10 sm:py-14 text-center cursor-pointer transition group ${
               dragging ? 'border-black bg-gray-100' : 'border-gray-300 hover:border-gray-400'
             }`}
           >
@@ -212,7 +212,7 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
         )}
 
         {/* Trust row */}
-        <div className="flex items-center justify-center gap-6 mt-8 text-xs text-gray-400">
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mt-8 text-xs text-gray-400">
           <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Private & secure</span>
           <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Instant processing</span>
           <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> No sign-up needed</span>
@@ -230,7 +230,7 @@ function ProcessingView({ phase, progress, name, mode }: { phase: Phase; progres
   const done = phase === 'ready';
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-white px-6 fade-in">
+    <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6 fade-in">
       <div className="w-full max-w-md text-center">
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gray-50 border border-gray-200 mb-6">
           {done ? (
