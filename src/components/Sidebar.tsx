@@ -177,11 +177,11 @@ export default function Sidebar({
       <div className="border-t border-gray-200 p-3">
         <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-200/70 transition cursor-pointer">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-700 to-black flex items-center justify-center text-white text-sm font-semibold">
-            JD
+            U
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate leading-none">Jordan Doe</p>
-            <p className="text-xs text-gray-500 mt-1 leading-none">Pro Plan</p>
+            <p className="text-sm font-semibold text-gray-900 truncate leading-none">Hey User</p>
+            <p className="text-xs text-gray-500 mt-1 leading-none">Welcome to AI chat Window</p>
           </div>
           <button className="p-1.5 rounded-lg hover:bg-gray-300/60 text-gray-500 transition" title="Settings">
             <Settings className="w-4 h-4" />

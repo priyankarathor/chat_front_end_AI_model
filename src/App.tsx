@@ -1,12 +1,24 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import UploadScreen from '@/components/UploadScreen';
 import ChatWorkspace from '@/components/ChatWorkspace';
 import type { ChatMessage, ChatSession, ChatSource } from '@/types';
-import { newId, streamResponse, titleFromSource } from '@/lib/ai';
+import { newId, titleFromSource } from '@/lib/ai';
+import { askDocument } from '@/lib/api';
+import type { ApiAuth } from '@/lib/api';
+import { loginUser, registerUser, type AuthSession } from '@/api/auth';
 import { useVoiceInput, useSpeech } from '@/lib/voice';
+import Login from '@/Authentication/login';
+import Register from '@/Authentication/register';
+
+const SESSION_KEY = 'reader-ai-session';
 
 export default function App() {
+  const [user, setUser] = useState<AuthSession | null>(null);
+  const [authView, setAuthView] = useState<'login' | 'register'>('login');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -20,6 +32,45 @@ export default function App() {
 
   const { listening, interim, start: startListen, stop: stopListen, supported: voiceSupported } = useVoiceInput();
   const { speakingId, speak, stop: stopSpeak } = useSpeech();
+
+  useEffect(() => {
+    const savedSession = localStorage.getItem(SESSION_KEY);
+    if (savedSession) {
+      try {
+        setUser(JSON.parse(savedSession) as AuthSession);
+      } catch {
+        localStorage.removeItem(SESSION_KEY);
+      }
+    }
+    setAuthLoading(false);
+  }, []);
+
+  const authenticate = async (
+    action: 'login' | 'register',
+    email: string,
+    password: string,
+    name?: string,
+  ) => {
+    setAuthError(null);
+    setAuthNotice(null);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    try {
+      if (action === 'register') {
+        const response = await registerUser({ name: name?.trim(), email: normalizedEmail, password });
+        setAuthView('login');
+        setAuthNotice(response.message ?? 'Account created. Please login.');
+        return;
+      }
+
+      const session = await loginUser({ email: normalizedEmail, password });
+      const sessionWithEmail = { ...session, email: session.email ?? normalizedEmail };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionWithEmail));
+      setUser(sessionWithEmail);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to sign in.');
+    }
+  };
 
   const activeSession = sessions.find((s) => s.id === activeId) ?? null;
 
@@ -41,10 +92,11 @@ export default function App() {
   }, []);
 
   const runAI = useCallback(
-    (question: string, sessionId: string) => {
+    async (question: string, sessionId: string) => {
       setIsGenerating(true);
       setPartialAnswer('');
       lastQuestionRef.current = question;
+      const controller = new AbortController();
 
       const aiMsg: ChatMessage = {
         id: newId(),
@@ -58,23 +110,48 @@ export default function App() {
         messages: [...s.messages, aiMsg],
       }));
 
-      cancelRef.current = streamResponse(
-        question,
-        (partial) => setPartialAnswer(partial),
-        (full) => {
-          updateSession(sessionId, (s) => ({
-            ...s,
-            messages: s.messages.map((m) =>
-              m.id === aiMsg.id ? { ...m, content: full } : m,
-            ),
-          }));
+      cancelRef.current = () => controller.abort();
+
+      try {
+        if (!user) {
+          throw new Error('Please sign in again before asking a question.');
+        }
+
+        const auth: ApiAuth = {
+          accessToken: user.accessToken,
+          userId: user.userId,
+        };
+        const answer = await askDocument(question, auth, controller.signal);
+        updateSession(sessionId, (s) => ({
+          ...s,
+          messages: s.messages.map((m) =>
+            m.id === aiMsg.id ? { ...m, content: answer } : m,
+          ),
+        }));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+
+        const message =
+          error instanceof Error ? error.message : 'Unable to get an answer from the server.';
+        updateSession(sessionId, (s) => ({
+          ...s,
+          messages: s.messages.map((m) =>
+            m.id === aiMsg.id
+              ? { ...m, content: `Sorry, I could not get an answer: ${message}` }
+              : m,
+          ),
+        }));
+      } finally {
+        if (!controller.signal.aborted) {
           setIsGenerating(false);
           setPartialAnswer('');
           cancelRef.current = null;
-        },
-      );
+        }
+      }
     },
-    [updateSession],
+    [updateSession, user],
   );
 
   const handleSend = useCallback(
@@ -157,6 +234,11 @@ export default function App() {
     }
   }, [voiceSupported, listening, stopListen, startListen, activeId, handleSend]);
 
+  if (authLoading) return <div className="flex min-h-screen items-center justify-center bg-[#f5f5f2] text-sm text-gray-500">Loading...</div>;
+  if (!user) return authView === 'login'
+    ? <Login onLogin={(email, password) => authenticate('login', email, password)} onSwitchToRegister={() => { setAuthError(null); setAuthNotice(null); setAuthView('register'); }} error={authError} notice={authNotice} />
+    : <Register onRegister={(name, email, password) => authenticate('register', email, password, name)} onSwitchToLogin={() => { setAuthError(null); setAuthNotice(null); setAuthView('login'); }} error={authError} />;
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white">
       <Sidebar
@@ -190,8 +272,15 @@ export default function App() {
             onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
           />
         ) : (
-          <UploadScreen onComplete={handleUploadComplete} />
+          <UploadScreen
+            auth={{
+              accessToken: user.accessToken,
+              userId: user.userId,
+            }}
+            onComplete={handleUploadComplete}
+          />
         )}
+        <button onClick={() => { localStorage.removeItem(SESSION_KEY); setUser(null); }} className="absolute right-4 top-4 z-10 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-600 shadow-sm ring-1 ring-gray-200 hover:text-black">Sign out</button>
       </main>
     </div>
   );

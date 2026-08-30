@@ -9,14 +9,16 @@ import {
   Link2,
 } from 'lucide-react';
 import type { ChatSource } from '@/types';
+import { uploadDocument, type ApiAuth } from '@/lib/api';
 
 interface UploadScreenProps {
+  auth: ApiAuth;
   onComplete: (source: ChatSource) => void;
 }
 
-type Phase = 'idle' | 'processing' | 'ready';
+type Phase = 'idle' | 'processing' | 'ready' | 'error';
 
-export default function UploadScreen({ onComplete }: UploadScreenProps) {
+export default function UploadScreen({ auth, onComplete }: UploadScreenProps) {
   const [mode, setMode] = useState<'document' | 'youtube'>('document');
   const [phase, setPhase] = useState<Phase>('idle');
   const [progress, setProgress] = useState(0);
@@ -24,14 +26,43 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
   const [fileSize, setFileSize] = useState('');
   const [url, setUrl] = useState('');
   const [urlError, setUrlError] = useState('');
+  const [uploadError, setUploadError] = useState('');
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const processDoc = (name: string, size: string) => {
+  const processDoc = async (file: File, size: string) => {
+    const { name } = file;
     setFileName(name);
     setFileSize(size);
+    setUploadError('');
     setPhase('processing');
+    setProgress(20);
+
+    try {
+      await uploadDocument(file, auth);
+      setProgress(100);
+      setPhase('ready');
+      setTimeout(() => {
+        onComplete({ type: 'document', name, size });
+      }, 500);
+    } catch (error) {
+      setProgress(0);
+      setPhase('error');
+      setUploadError(error instanceof Error ? error.message : 'Unable to upload document.');
+    }
+  };
+
+  const resetUpload = () => {
+    setPhase('idle');
     setProgress(0);
+    setUploadError('');
+    setFileName('');
+    setFileSize('');
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const simulateProgressToReady = (complete: () => void) => {
+    setUploadError('');
     const iv = setInterval(() => {
       setProgress((p) => {
         const next = p + Math.random() * 18 + 6;
@@ -39,7 +70,7 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
           clearInterval(iv);
           setPhase('ready');
           setTimeout(() => {
-            onComplete({ type: 'document', name, size });
+            complete();
           }, 700);
           return 100;
         }
@@ -52,7 +83,7 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
     const sizeLabel = file.size > 1024 * 1024
       ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
       : `${Math.max(1, Math.round(file.size / 1024))} KB`;
-    processDoc(file.name, sizeLabel);
+    void processDoc(file, sizeLabel);
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -85,32 +116,25 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
     setFileName('YouTube Video');
     setPhase('processing');
     setProgress(0);
-    const steps = ['Extracting transcript', 'Processing content', 'Preparing chat'];
-    let s = 0;
-    const iv = setInterval(() => {
-      setProgress((p) => {
-        const next = p + Math.random() * 16 + 8;
-        if (next >= 100) {
-          clearInterval(iv);
-          setPhase('ready');
-          setTimeout(() => {
-            onComplete({
-              type: 'youtube',
-              name: `YouTube Video · ${id}`,
-              videoId: id,
-            });
-          }, 700);
-          return 100;
-        }
-        const idx = Math.min(steps.length - 1, Math.floor((next / 100) * steps.length));
-        if (idx !== s) s = idx;
-        return next;
+    simulateProgressToReady(() => {
+      onComplete({
+        type: 'youtube',
+        name: `YouTube Video - ${id}`,
+        videoId: id,
       });
-    }, 220);
+    });
   };
-
-  if (phase === 'processing' || phase === 'ready') {
-    return <ProcessingView phase={phase} progress={progress} name={fileName} mode={mode} />;
+  if (phase === 'processing' || phase === 'ready' || phase === 'error') {
+    return (
+      <ProcessingView
+        phase={phase}
+        progress={progress}
+        name={fileName}
+        mode={mode}
+        error={uploadError}
+        onRetry={resetUpload}
+      />
+    );
   }
 
   return (
@@ -178,7 +202,7 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
               Drop your document here, or click to browse
             </p>
             <p className="text-sm text-gray-500 mt-1.5">
-              PDF, DOCX, TXT, MD, CSV — up to 20 MB
+              PDF, DOCX, TXT, MD, CSV - up to 20 MB
             </p>
           </div>
         ) : (
@@ -221,13 +245,27 @@ export default function UploadScreen({ onComplete }: UploadScreenProps) {
     </div>
   );
 }
-
-function ProcessingView({ phase, progress, name, mode }: { phase: Phase; progress: number; name: string; mode: 'document' | 'youtube'; }) {
+function ProcessingView({
+  phase,
+  progress,
+  name,
+  mode,
+  error,
+  onRetry,
+}: {
+  phase: Phase;
+  progress: number;
+  name: string;
+  mode: 'document' | 'youtube';
+  error: string;
+  onRetry: () => void;
+}) {
   const steps = mode === 'document'
     ? ['Reading document', 'Extracting text', 'Indexing content', 'Preparing chat']
     : ['Extracting transcript', 'Processing content', 'Indexing content', 'Preparing chat'];
   const currentStep = Math.min(steps.length - 1, Math.floor((progress / 100) * steps.length));
   const done = phase === 'ready';
+  const failed = phase === 'error';
 
   return (
     <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6 fade-in">
@@ -235,23 +273,39 @@ function ProcessingView({ phase, progress, name, mode }: { phase: Phase; progres
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gray-50 border border-gray-200 mb-6">
           {done ? (
             <CheckCircle2 className="w-10 h-10 text-black" />
+          ) : failed ? (
+            <FileText className="w-10 h-10 text-red-500" />
           ) : (
             <Loader2 className="w-10 h-10 text-black animate-spin" />
           )}
         </div>
         <h2 className="text-2xl font-bold text-black mb-1">
-          {done ? 'Ready to chat' : 'Processing your content'}
+          {failed ? 'Upload failed' : done ? 'Ready to chat' : 'Processing your content'}
         </h2>
         <p className="text-gray-500 text-sm mb-8 truncate">{name}</p>
 
-        <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden mb-6">
+        {failed && (
+          <>
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-5">
+              {error}
+            </p>
+            <button
+              onClick={onRetry}
+              className="h-11 px-5 rounded-xl bg-black text-white text-sm font-semibold hover:bg-gray-800 active:scale-[0.99] transition"
+            >
+              Choose another file
+            </button>
+          </>
+        )}
+
+        {!failed && <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden mb-6">
           <div
             className="h-full bg-black rounded-full transition-all duration-200"
             style={{ width: `${progress}%` }}
           />
-        </div>
+        </div>}
 
-        <div className="space-y-2.5 text-left">
+        {!failed && <div className="space-y-2.5 text-left">
           {steps.map((s, i) => {
             const complete = i < currentStep || done;
             const active = i === currentStep && !done;
@@ -270,7 +324,7 @@ function ProcessingView({ phase, progress, name, mode }: { phase: Phase; progres
               </div>
             );
           })}
-        </div>
+        </div>}
       </div>
     </div>
   );
