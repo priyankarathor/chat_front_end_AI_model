@@ -8,9 +8,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://chat-backend-ai-model.vercel.app/',
+        target: 'https://chat-backend-ai-model.vercel.app',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },
