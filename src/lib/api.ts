@@ -58,7 +58,8 @@ export async function uploadYouTubeUrl(
   url: string,
   question: string,
   auth: ApiAuth,
-): Promise<string | undefined> {
+  signal?: AbortSignal,
+): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/documents/youtube-url`, {
     method: 'POST',
     headers: {
@@ -69,6 +70,7 @@ export async function uploadYouTubeUrl(
       urls: [url],
       question,
     }),
+    signal,
   });
 
   if (!response.ok) {
@@ -77,7 +79,12 @@ export async function uploadYouTubeUrl(
 
   const data = (await response.json()) as YouTubeUrlResponse;
   const answer = data.answer ?? data.response ?? data.message;
-  return typeof answer === 'string' && answer.trim() ? answer : undefined;
+
+  if (typeof answer === 'string' && answer.trim()) {
+    return answer;
+  }
+
+  return JSON.stringify(data, null, 2);
 }
 
 export async function askDocument(

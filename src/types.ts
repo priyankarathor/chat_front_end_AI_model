@@ -5,10 +5,8 @@ export interface ChatSource {
   name: string;
   /** For youtube, the video ID */
   videoId?: string;
-  /** Initial prompt asked while preparing a source */
-  initialQuestion?: string;
-  /** Initial answer returned while preparing a source */
-  initialAnswer?: string;
+  /** Full URL sent with each YouTube question */
+  youtubeUrl?: string;
   /** file size label for documents */
   size?: string;
 }

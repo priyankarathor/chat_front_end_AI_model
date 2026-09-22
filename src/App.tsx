@@ -4,7 +4,7 @@ import UploadScreen from '@/components/UploadScreen';
 import ChatWorkspace from '@/components/ChatWorkspace';
 import type { ChatMessage, ChatSession, ChatSource } from '@/types';
 import { newId, titleFromSource } from '@/lib/ai';
-import { askDocument } from '@/lib/api';
+import { askDocument, uploadYouTubeUrl } from '@/lib/api';
 import type { ApiAuth } from '@/lib/api';
 import { loginUser, registerUser, type AuthSession } from '@/api/auth';
 import { useVoiceInput, useSpeech } from '@/lib/voice';
@@ -79,28 +79,11 @@ export default function App() {
   }, []);
 
   const handleUploadComplete = useCallback((source: ChatSource) => {
-    const messages: ChatMessage[] = source.initialQuestion && source.initialAnswer
-      ? [
-          {
-            id: newId(),
-            role: 'user',
-            content: source.initialQuestion,
-            createdAt: Date.now(),
-          },
-          {
-            id: newId(),
-            role: 'ai',
-            content: source.initialAnswer,
-            createdAt: Date.now(),
-          },
-        ]
-      : [];
-
     const session: ChatSession = {
       id: newId(),
       title: titleFromSource(source),
       source,
-      messages,
+      messages: [],
       createdAt: Date.now(),
     };
     setSessions((prev) => [session, ...prev]);
@@ -109,7 +92,7 @@ export default function App() {
   }, []);
 
   const runAI = useCallback(
-    async (question: string, sessionId: string) => {
+    async (question: string, sessionId: string, source: ChatSource) => {
       setIsGenerating(true);
       setPartialAnswer('');
       lastQuestionRef.current = question;
@@ -138,7 +121,9 @@ export default function App() {
           accessToken: user.accessToken,
           userId: user.userId,
         };
-        const answer = await askDocument(question, auth, controller.signal);
+        const answer = source.type === 'youtube' && source.youtubeUrl
+          ? await uploadYouTubeUrl(source.youtubeUrl, question, auth, controller.signal)
+          : await askDocument(question, auth, controller.signal);
         updateSession(sessionId, (s) => ({
           ...s,
           messages: s.messages.map((m) =>
@@ -184,9 +169,9 @@ export default function App() {
         ...s,
         messages: [...s.messages, userMsg],
       }));
-      runAI(text, activeId);
+      if (activeSession) runAI(text, activeId, activeSession.source);
     },
-    [activeId, updateSession, runAI],
+    [activeId, activeSession, updateSession, runAI],
   );
 
   const handleRegenerate = useCallback(() => {
@@ -197,8 +182,8 @@ export default function App() {
       if (msgs.length && msgs[msgs.length - 1].role === 'ai') msgs.pop();
       return { ...s, messages: msgs };
     });
-    runAI(lastQuestionRef.current, activeId);
-  }, [activeId, isGenerating, updateSession, runAI]);
+    if (activeSession) runAI(lastQuestionRef.current, activeId, activeSession.source);
+  }, [activeId, activeSession, isGenerating, updateSession, runAI]);
 
   const handleNewChat = useCallback(() => {
     if (cancelRef.current) {
