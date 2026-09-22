@@ -9,7 +9,7 @@ import {
   Link2,
 } from 'lucide-react';
 import type { ChatSource } from '@/types';
-import { uploadDocument, type ApiAuth } from '@/lib/api';
+import { uploadDocument, uploadYouTubeUrl, type ApiAuth } from '@/lib/api';
 
 interface UploadScreenProps {
   auth: ApiAuth;
@@ -18,13 +18,16 @@ interface UploadScreenProps {
 
 type Phase = 'idle' | 'processing' | 'ready' | 'error';
 
+const DEFAULT_YOUTUBE_URL = 'https://www.youtube.com/watch?v=2vYV4K1RQ1w';
+const DEFAULT_YOUTUBE_QUESTION = 'What is this video about?';
+
 export default function UploadScreen({ auth, onComplete }: UploadScreenProps) {
   const [mode, setMode] = useState<'document' | 'youtube'>('document');
   const [phase, setPhase] = useState<Phase>('idle');
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(DEFAULT_YOUTUBE_URL);
   const [urlError, setUrlError] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -56,27 +59,10 @@ export default function UploadScreen({ auth, onComplete }: UploadScreenProps) {
     setPhase('idle');
     setProgress(0);
     setUploadError('');
+    setUrlError('');
     setFileName('');
     setFileSize('');
     if (inputRef.current) inputRef.current.value = '';
-  };
-
-  const simulateProgressToReady = (complete: () => void) => {
-    setUploadError('');
-    const iv = setInterval(() => {
-      setProgress((p) => {
-        const next = p + Math.random() * 18 + 6;
-        if (next >= 100) {
-          clearInterval(iv);
-          setPhase('ready');
-          setTimeout(() => {
-            complete();
-          }, 700);
-          return 100;
-        }
-        return next;
-      });
-    }, 180);
   };
 
   const handleFile = (file: File) => {
@@ -105,24 +91,42 @@ export default function UploadScreen({ auth, onComplete }: UploadScreenProps) {
     }
     return null;
   };
+  const normalizeYouTubeUrl = (value: string): string => {
+    const markdownMatch = value.match(/\((https?:\/\/[^)]+)\)/);
+    return (markdownMatch?.[1] ?? value).trim();
+  };
 
-  const processYouTube = (rawUrl: string) => {
-    const id = extractYouTubeId(rawUrl);
+  const processYouTube = async (rawUrl: string) => {
+    const normalizedUrl = normalizeYouTubeUrl(rawUrl);
+    const id = extractYouTubeId(normalizedUrl);
     if (!id) {
       setUrlError('Please enter a valid YouTube URL.');
       return;
     }
     setUrlError('');
+    setUploadError('');
     setFileName('YouTube Video');
     setPhase('processing');
-    setProgress(0);
-    simulateProgressToReady(() => {
-      onComplete({
-        type: 'youtube',
-        name: `YouTube Video - ${id}`,
-        videoId: id,
-      });
-    });
+    setProgress(35);
+
+    try {
+      const initialAnswer = await uploadYouTubeUrl(normalizedUrl, DEFAULT_YOUTUBE_QUESTION, auth);
+      setProgress(100);
+      setPhase('ready');
+      setTimeout(() => {
+        onComplete({
+          type: 'youtube',
+          name: `YouTube Video - ${id}`,
+          videoId: id,
+          initialQuestion: DEFAULT_YOUTUBE_QUESTION,
+          initialAnswer,
+        });
+      }, 500);
+    } catch (error) {
+      setProgress(0);
+      setPhase('error');
+      setUploadError(error instanceof Error ? error.message : 'Unable to process YouTube URL.');
+    }
   };
   if (phase === 'processing' || phase === 'ready' || phase === 'error') {
     return (
@@ -215,14 +219,14 @@ export default function UploadScreen({ auth, onComplete }: UploadScreenProps) {
               <input
                 value={url}
                 onChange={(e) => { setUrl(e.target.value); setUrlError(''); }}
-                onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) processYouTube(url.trim()); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) void processYouTube(url.trim()); }}
                 placeholder="https://www.youtube.com/watch?v=..."
                 className="w-full h-12 pl-11 pr-4 rounded-xl bg-white border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-300 transition"
               />
             </div>
             {urlError && <p className="text-sm text-red-500 mt-2">{urlError}</p>}
             <button
-              onClick={() => processYouTube(url.trim())}
+              onClick={() => void processYouTube(url.trim())}
               disabled={!url.trim()}
               className="mt-4 w-full h-11 rounded-xl bg-black text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.99] transition"
             >
@@ -329,3 +333,4 @@ function ProcessingView({
     </div>
   );
 }
+

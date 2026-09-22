@@ -79,11 +79,28 @@ export default function App() {
   }, []);
 
   const handleUploadComplete = useCallback((source: ChatSource) => {
+    const messages: ChatMessage[] = source.initialQuestion && source.initialAnswer
+      ? [
+          {
+            id: newId(),
+            role: 'user',
+            content: source.initialQuestion,
+            createdAt: Date.now(),
+          },
+          {
+            id: newId(),
+            role: 'ai',
+            content: source.initialAnswer,
+            createdAt: Date.now(),
+          },
+        ]
+      : [];
+
     const session: ChatSession = {
       id: newId(),
       title: titleFromSource(source),
       source,
-      messages: [],
+      messages,
       createdAt: Date.now(),
     };
     setSessions((prev) => [session, ...prev]);
@@ -285,3 +302,4 @@ export default function App() {
     </div>
   );
 }
+

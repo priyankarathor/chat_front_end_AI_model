@@ -14,6 +14,8 @@ export interface ApiAuth {
   userId: string;
 }
 
+type YouTubeUrlResponse = AskResponse;
+
 function messageFromError(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong.';
 }
@@ -52,6 +54,32 @@ export async function uploadDocument(file: File, auth: ApiAuth): Promise<void> {
   }
 }
 
+export async function uploadYouTubeUrl(
+  url: string,
+  question: string,
+  auth: ApiAuth,
+): Promise<string | undefined> {
+  const response = await fetch(`${API_BASE_URL}/documents/youtube-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(auth),
+    },
+    body: JSON.stringify({
+      urls: [url],
+      question,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+
+  const data = (await response.json()) as YouTubeUrlResponse;
+  const answer = data.answer ?? data.response ?? data.message;
+  return typeof answer === 'string' && answer.trim() ? answer : undefined;
+}
+
 export async function askDocument(
   question: string,
   auth: ApiAuth,
@@ -87,3 +115,4 @@ export async function askDocument(
     throw new Error(messageFromError(error));
   }
 }
+
